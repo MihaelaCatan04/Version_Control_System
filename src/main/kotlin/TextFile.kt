@@ -19,5 +19,14 @@ class TextFile(
     fun getCharactersCount(): Int {
         return charactersCount
     }
+    fun setLineCount(lineCount: Int) {
+        this.lineCount = lineCount
+    }
+    fun setWordCount(wordCount: Int) {
+        this.wordCount = wordCount
+    }
+    fun setCharactersCount(charactersCount: Int) {
+        this.charactersCount = charactersCount
+    }
 
 }

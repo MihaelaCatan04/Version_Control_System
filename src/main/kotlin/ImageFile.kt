@@ -16,5 +16,13 @@ class ImageFile(
     fun getHeight(): Int {
         return height
     }
+
+    fun setWidth(width: Int) {
+        this.width = width
+    }
+
+    fun setHeight(height: Int) {
+        this.height = height
+    }
 }
 

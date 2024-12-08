@@ -21,4 +21,16 @@ class ProgramFile(
     fun getMethodCount(): Int {
         return methodCount
     }
+
+    fun setLineCount(lineCount: Int) {
+        this.lineCount = lineCount
+    }
+
+    fun setClassCount(classCount: Int) {
+        this.classCount = classCount
+    }
+
+    fun setMethodCount(methodCount: Int) {
+        this.methodCount = methodCount
+    }
 }

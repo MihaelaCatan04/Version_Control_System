@@ -1,5 +1,7 @@
 package org.example
 
+import java.nio.file.Files
+import java.nio.file.attribute.BasicFileAttributes
 import java.text.SimpleDateFormat
 import java.util.*
 import javax.imageio.ImageIO
@@ -9,6 +11,7 @@ class FolderMonitor(
     private val path: String
 ) {
     private val monitoredFiles: MutableMap<String, File> = mutableMapOf()
+    private val deletedDicOfFiles: MutableMap<String, File> = mutableMapOf()
     private var snapshot: Long = System.currentTimeMillis()
 
     fun refreshFiles() {
@@ -33,6 +36,7 @@ class FolderMonitor(
                 if (file.isFile && !monitoredFiles.containsKey(file.name)) {
                     val monitorFile = createFileMonitor(file)
                     monitoredFiles[file.name] = monitorFile
+                    println("\n${monitorFile.getName()} was CREATED.\nsrc/trackedRepository> ")
                 }
             }
         }
@@ -40,16 +44,25 @@ class FolderMonitor(
         // Detect deleted files
         val deletedFiles = monitoredFiles.keys - currentFileNames
         for (deletedFile in deletedFiles) {
-            monitoredFiles.remove(deletedFile)
+            val monitorFile = monitoredFiles[deletedFile]
+            if (monitorFile != null) {
+                monitorFile.setStatus("Deleted")
+                deletedDicOfFiles[deletedFile] = monitorFile
+                monitoredFiles.remove(deletedFile)
+                println("\n${monitorFile.getName()} was DELETED.\nsrc/trackedRepository> ")
+            }
         }
 
         // Update file statuses
-        if (currentFiles != null && currentFiles.isNotEmpty()) {
+        if (currentFiles != null) {
             for (file in currentFiles) {
                 val monitorFile = monitoredFiles[file.name]
                 if (monitorFile != null && file.lastModified() != monitorFile.getLastChanged().toLong()) {
                     monitorFile.setLastChanged(file.lastModified())
                     monitorFile.setStatus("Changed")
+                    updateFileAttributes(monitorFile, file)
+                    println("\n${monitorFile.getName()} was UPDATED.\nsrc/trackedRepository> ")
+
                 }
             }
         }
@@ -65,20 +78,20 @@ class FolderMonitor(
             AcceptedExtentions.txt -> return TextFile(
                 file.name,
                 extension,
+                Files.readAttributes(file.toPath(), BasicFileAttributes::class.java).creationTime().toMillis(),
                 file.lastModified(),
-                file.lastModified(),
-                "No change",
+                "New File",
                 lineCount = file.readLines().size,
-                wordCount = file.readText().split("\\s+".toRegex()).size,
+                wordCount = file.readText().split("\\s+".toRegex()).filter { it.isNotEmpty() }.size,
                 charactersCount = file.readText().length
             )
 
             AcceptedExtentions.kt, AcceptedExtentions.py -> return ProgramFile(
                 file.name,
                 extension,
+                Files.readAttributes(file.toPath(), BasicFileAttributes::class.java).creationTime().toMillis(),
                 file.lastModified(),
-                file.lastModified(),
-                "No change",
+                "New File",
                 lineCount = file.readLines().size,
                 classCount = file.readLines().count { it.contains("class ") },
                 methodCount = file.readLines().count { it.contains("def ") || it.contains("fun ") }
@@ -89,9 +102,9 @@ class FolderMonitor(
                 return ImageFile(
                     file.name,
                     extension,
+                    Files.readAttributes(file.toPath(), BasicFileAttributes::class.java).creationTime().toMillis(),
                     file.lastModified(),
-                    file.lastModified(),
-                    "No change",
+                    "New File",
                     width = image.width,
                     height = image.height
                 )
@@ -101,21 +114,33 @@ class FolderMonitor(
 
 
     fun commit() {
-        snapshot = System.currentTimeMillis()
-        for (file in monitoredFiles.values) {
-            file.setStatus("No change")
+        val hasChanges = monitoredFiles.values.any { it.getStatus() != "No change" }
+        if (hasChanges) {
+            for (file in monitoredFiles.values) {
+                file.setStatus("No change")
+            }
+            snapshot = System.currentTimeMillis()
+        } else {
+            println("No changes to commit.")
         }
-        TODO("Update snapshot only when there are changes")
+
     }
 
     fun info(fileName: String) {
-        if (fileName == "all files") {
+        if (fileName == "all") {
             for (file in monitoredFiles.values) {
                 println(file.getName() + " - " + file.getStatus())
                 println("Extension: " + file.getExtension())
-                println("Created: " + file.getCreated())
-                println("Updated: " + file.getLastChanged())
+                println("Created: " + SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(Date(file.getCreated())))
+                println("Updated: " + SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(Date(file.getLastChanged())))
             }
+            for (file in deletedDicOfFiles.values) {
+                println(file.getName() + " - " + file.getStatus())
+                println("Extension: " + file.getExtension())
+                println("Created: " + SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(Date(file.getCreated())))
+                println("Updated: " + SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(Date(file.getLastChanged())))
+            }
+
         } else {
             var file: File? = null
             for (existingFile in monitoredFiles.values) {
@@ -150,10 +175,38 @@ class FolderMonitor(
         for (file in monitoredFiles.values) {
             println(file.getName() + " - " + file.getStatus())
         }
+
+        for (file in deletedDicOfFiles.values) {
+            println(file.getName() + " - " + file.getStatus())
+        }
+
     }
+
     fun startTimer() {
         fixedRateTimer("folder-monitor", initialDelay = 0, period = 5000) {
             refreshFiles()
+        }
+    }
+
+    private fun updateFileAttributes(fileToUpdate: File, file: java.io.File) {
+        when (fileToUpdate) {
+            is TextFile -> {
+                fileToUpdate.setLineCount(file.readLines().size)
+                fileToUpdate.setWordCount(file.readText().split("\\s+".toRegex()).filter { it.isNotEmpty() }.size)
+                fileToUpdate.setCharactersCount(file.readText().length)
+            }
+
+            is ProgramFile -> {
+                fileToUpdate.setLineCount(file.readLines().size)
+                fileToUpdate.setClassCount(file.readLines().count { it.contains("class ") })
+                fileToUpdate.setMethodCount(file.readLines().count { it.contains("def ") || it.contains("fun ") })
+            }
+
+            is ImageFile -> {
+                val image = ImageIO.read(file)
+                fileToUpdate.setWidth(image.width)
+                fileToUpdate.setHeight(image.height)
+            }
         }
     }
 

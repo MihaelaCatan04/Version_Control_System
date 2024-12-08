@@ -22,17 +22,18 @@ abstract class File(
         return extension
     }
 
-    fun getCreated(): String {
-        return SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(Date(created))
+    fun getCreated(): Long {
+        return created
     }
 
-    fun getLastChanged(): String {
-        return SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(Date(lastChanged))
+    fun getLastChanged(): Long {
+        return lastChanged
     }
 
     fun getStatus(): String {
         return status
     }
+
     fun setLastChanged(time: Long) {
         lastChanged = time
     }
