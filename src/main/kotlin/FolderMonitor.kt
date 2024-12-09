@@ -17,7 +17,54 @@ class FolderMonitor(
     private val deletedDicOfFiles: MutableMap<String, File> = mutableMapOf()
     // Variable to store snapshot time
     private var snapshot: Long = System.currentTimeMillis()
+    // Variable to store deteled but not commited files
+    private val deletedUncommitedFiles: MutableMap<String, File> = mutableMapOf()
 
+    // Detect new files
+    private fun detectNewFiles(currentFiles: Array<java.io.File>?) {
+        if (currentFiles != null) {
+            if (currentFiles.isNotEmpty()) {
+                for (file in currentFiles) {
+                    if (file.isFile && !monitoredFiles.containsKey(file.name)) {
+                        val monitorFile = createFileMonitor(file)
+                        monitoredFiles[file.name] = monitorFile
+                        println("\n${monitorFile.getName()} was CREATED.\nsrc/trackedRepository> ")
+                    }
+                }
+            }
+        }
+    }
+
+    // Detect deleted files
+    private fun detectDeletedFiles(currentFileNames: List<String>) {
+        val deletedFiles = monitoredFiles.keys - currentFileNames
+        for (deletedFile in deletedFiles) {
+            if (!deletedUncommitedFiles.containsKey(deletedFile)) {
+                val monitorFile = monitoredFiles[deletedFile]
+                if (monitorFile != null) {
+                    monitorFile.setStatus("Deleted")
+                    deletedUncommitedFiles[deletedFile] = monitorFile
+                    println("\n${monitorFile.getName()} was DELETED.\nsrc/trackedRepository> ")
+                }
+            }
+        }
+    }
+
+    // Detect updated files
+    private fun detectUpdatedFiles(currentFiles: Array<java.io.File>?) {
+        if (currentFiles != null) {
+            for (file in currentFiles) {
+                val monitorFile = monitoredFiles[file.name]
+                if (monitorFile != null && file.lastModified() != monitorFile.getLastChanged().toLong()) {
+                    monitorFile.setLastChanged(file.lastModified())
+                    monitorFile.setStatus("Changed")
+                    updateFileAttributes(monitorFile, file)
+                    println("\n${monitorFile.getName()} was UPDATED.\nsrc/trackedRepository> ")
+
+                }
+            }
+        }
+    }
     // Method to check for inserts, updates or deletions
     fun refreshFiles() {
         val directory = java.io.File(path)
@@ -35,43 +82,9 @@ class FolderMonitor(
             }
         }
 
-        // Detect new files
-        if (!currentFiles.isNullOrEmpty()) {
-            for (file in currentFiles) {
-                if (file.isFile && !monitoredFiles.containsKey(file.name)) {
-                    val monitorFile = createFileMonitor(file)
-                    monitoredFiles[file.name] = monitorFile
-                    println("\n${monitorFile.getName()} was CREATED.\nsrc/trackedRepository> ")
-                }
-            }
-        }
-
-        // Detect deleted files
-        val deletedFiles = monitoredFiles.keys - currentFileNames
-        for (deletedFile in deletedFiles) {
-            val monitorFile = monitoredFiles[deletedFile]
-            if (monitorFile != null) {
-                monitorFile.setStatus("Deleted")
-                deletedDicOfFiles[deletedFile] = monitorFile
-                monitoredFiles.remove(deletedFile)
-                println("\n${monitorFile.getName()} was DELETED.\nsrc/trackedRepository> ")
-            }
-        }
-
-        // Update file statuses
-        if (currentFiles != null) {
-            for (file in currentFiles) {
-                val monitorFile = monitoredFiles[file.name]
-                if (monitorFile != null && file.lastModified() != monitorFile.getLastChanged().toLong()) {
-                    monitorFile.setLastChanged(file.lastModified())
-                    monitorFile.setStatus("Changed")
-                    updateFileAttributes(monitorFile, file)
-                    println("\n${monitorFile.getName()} was UPDATED.\nsrc/trackedRepository> ")
-
-                }
-            }
-        }
-
+        detectNewFiles(currentFiles)
+        detectDeletedFiles(currentFileNames)
+        detectUpdatedFiles(currentFiles)
     }
     // Create File objects for each file in the tracked repository
     private fun createFileMonitor(file: java.io.File): File {
@@ -121,27 +134,34 @@ class FolderMonitor(
     fun commit() {
         val hasChanges = monitoredFiles.values.any { it.getStatus() != "No change" }
         if (hasChanges) {
+            // Commit deleted files
+            for (fileName in deletedUncommitedFiles.keys) {
+                val file = monitoredFiles[fileName]
+                if (file != null) {
+                    deletedDicOfFiles[fileName] = file
+                    monitoredFiles.remove(fileName)
+                }
+            }
+            deletedUncommitedFiles.clear()
+
+
+            // Reset the status of remaining files
             for (file in monitoredFiles.values) {
                 file.setStatus("No change")
             }
+
+            // Update the snapshot time
             snapshot = System.currentTimeMillis()
         } else {
             println("No changes to commit.")
         }
-
     }
 
     // Info method
     fun info(fileName: String) {
         // info all
         if (fileName == "all") {
-            for (file in monitoredFiles.values) {
-                println(file.getName() + " - " + file.getStatus())
-                println("Extension: " + file.getExtension())
-                println("Created: " + SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(Date(file.getCreated())))
-                println("Updated: " + SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(Date(file.getLastChanged())))
-            }
-            for (file in deletedDicOfFiles.values) {
+            for (file in monitoredFiles.values + deletedDicOfFiles.values) {
                 println(file.getName() + " - " + file.getStatus())
                 println("Extension: " + file.getExtension())
                 println("Created: " + SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(Date(file.getCreated())))
@@ -182,11 +202,7 @@ class FolderMonitor(
     // Status method
     fun status() {
         println("Created Snapshot at: ${SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(Date(snapshot))}")
-        for (file in monitoredFiles.values) {
-            println(file.getName() + " - " + file.getStatus())
-        }
-
-        for (file in deletedDicOfFiles.values) {
+        for (file in monitoredFiles.values + deletedDicOfFiles.values) {
             println(file.getName() + " - " + file.getStatus())
         }
 
