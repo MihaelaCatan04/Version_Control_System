@@ -3,6 +3,7 @@ package org.example
 import java.text.SimpleDateFormat
 import java.util.*
 
+// Abstract class for file
 abstract class File(
     private val name: String,
     private val extension: AcceptedExtentions,

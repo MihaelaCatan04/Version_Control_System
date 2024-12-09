@@ -1,5 +1,6 @@
 package org.example
 
+// Class for Text file
 class TextFile(
     private val name: String,
     private val extension: AcceptedExtentions,

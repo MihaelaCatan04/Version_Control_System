@@ -1,5 +1,6 @@
 package org.example
 
+// Class for Program file
 class ProgramFile(
     private val name: String,
     private val extension: AcceptedExtentions,

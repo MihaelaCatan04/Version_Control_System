@@ -1,6 +1,7 @@
 import org.example.FolderMonitor
 
 fun main() {
+    // Static path for the tracked folder
     val folderMonitor = FolderMonitor("src/trackedRepository")
     folderMonitor.refreshFiles()
     folderMonitor.startTimer()

@@ -1,5 +1,6 @@
 package org.example
 
+// Class for Image file
 class ImageFile(
     private val name: String,
     private val extension: AcceptedExtentions,

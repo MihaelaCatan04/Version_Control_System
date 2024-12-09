@@ -7,13 +7,18 @@ import java.util.*
 import javax.imageio.ImageIO
 import kotlin.concurrent.fixedRateTimer
 
+// Class for Folder Monitor
 class FolderMonitor(
     private val path: String
 ) {
+    // Dictionary to store monitored files
     private val monitoredFiles: MutableMap<String, File> = mutableMapOf()
+    // Dictionary to store deleted files
     private val deletedDicOfFiles: MutableMap<String, File> = mutableMapOf()
+    // Variable to store snapshot time
     private var snapshot: Long = System.currentTimeMillis()
 
+    // Method to check for inserts, updates or deletions
     fun refreshFiles() {
         val directory = java.io.File(path)
         if (!directory.exists() || !directory.isDirectory) {
@@ -68,7 +73,7 @@ class FolderMonitor(
         }
 
     }
-
+    // Create File objects for each file in the tracked repository
     private fun createFileMonitor(file: java.io.File): File {
         val extension = AcceptedExtentions.entries.find { file.name.endsWith(it.name) }
         if (extension == null) {
@@ -112,7 +117,7 @@ class FolderMonitor(
         }
     }
 
-
+    // Commit method
     fun commit() {
         val hasChanges = monitoredFiles.values.any { it.getStatus() != "No change" }
         if (hasChanges) {
@@ -126,7 +131,9 @@ class FolderMonitor(
 
     }
 
+    // Info method
     fun info(fileName: String) {
+        // info all
         if (fileName == "all") {
             for (file in monitoredFiles.values) {
                 println(file.getName() + " - " + file.getStatus())
@@ -153,13 +160,15 @@ class FolderMonitor(
                 throw Error("File not found")
             } else {
                 when (file) {
+                    // info imageFile.png or info imageFile.jpg
                     is ImageFile -> println("Dimensions: ${file.getWidth()} x ${file.getHeight()}")
+                    // info textFile.txt
                     is TextFile -> {
                         println("Line Count: ${file.getLineCount()}")
                         println("Word Count: ${file.getWordCount()}")
                         println("Character Count: ${file.getCharactersCount()}")
                     }
-
+                    // info program.py or info program.kt
                     is ProgramFile -> {
                         println("Line Count: ${file.getLineCount()}")
                         println("Class Count: ${file.getClassCount()}")
@@ -170,6 +179,7 @@ class FolderMonitor(
         }
     }
 
+    // Status method
     fun status() {
         println("Created Snapshot at: ${SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(Date(snapshot))}")
         for (file in monitoredFiles.values) {
@@ -182,12 +192,14 @@ class FolderMonitor(
 
     }
 
+    // Scheduler
     fun startTimer() {
         fixedRateTimer("folder-monitor", initialDelay = 0, period = 5000) {
             refreshFiles()
         }
     }
 
+    // Update file attributes
     private fun updateFileAttributes(fileToUpdate: File, file: java.io.File) {
         when (fileToUpdate) {
             is TextFile -> {
